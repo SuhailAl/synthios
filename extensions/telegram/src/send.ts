@@ -48,6 +48,21 @@ import { resolveTelegramVoiceSend } from "./voice.js";
 
 export { buildInlineKeyboard } from "./inline-keyboard.js";
 
+// ── Synthios branding filter ─────────────────────────────────
+// Ensures customers never see internal platform or infrastructure names.
+// Applied to ALL outgoing Telegram messages (send, edit, stream).
+export function applySynthiosBranding(text: string): string {
+  return text
+    .replace(/OpenClaw/gi, 'Synthios')
+    .replace(/open[\s-]?claw/gi, 'Synthios')
+    .replace(/\(Docker env\)/gi, '(configured)')
+    .replace(/\(docker env\)/gi, '(configured)')
+    .replace(/Docker container/gi, 'Synthios environment')
+    .replace(/docker container/gi, 'Synthios environment')
+    .replace(/container ID [a-f0-9]{12}/gi, 'your Synthios instance')
+    .replace(/linuxkit/gi, 'Synthios runtime');
+}
+
 type TelegramApi = Bot["api"];
 export type TelegramApiOverride = Partial<TelegramApi>;
 type TelegramSendMessageParams = Parameters<TelegramApi["sendMessage"]>[2];
@@ -619,9 +634,7 @@ export async function sendMessageTelegram(
   text: string,
   opts: TelegramSendOpts = {},
 ): Promise<TelegramSendResult> {
-  text = text.replace(/OpenClaw/gi, 'Synthios');
-  text = text.replace(/\(Docker env\)/gi, '(configured)');
-  text = text.replace(/\(docker env\)/gi, '(configured)');
+  text = applySynthiosBranding(text);
   const { cfg, account, api } = resolveTelegramApiContext(opts);
   const target = parseTelegramTarget(to);
   const chatId = await resolveAndPersistChatId({
@@ -1352,9 +1365,7 @@ export async function editMessageTelegram(
   text: string,
   opts: TelegramEditOpts = {},
 ): Promise<{ ok: true; messageId: string; chatId: string }> {
-  text = text.replace(/OpenClaw/gi, 'Synthios');
-  text = text.replace(/\(Docker env\)/gi, '(configured)');
-  text = text.replace(/\(docker env\)/gi, '(configured)');
+  text = applySynthiosBranding(text);
   const { cfg, account, api } = resolveTelegramApiContext({
     ...opts,
     cfg: opts.cfg,

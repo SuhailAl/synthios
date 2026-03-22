@@ -3,6 +3,7 @@ import { createFinalizableDraftLifecycle } from "openclaw/plugin-sdk/channel-lif
 import { buildTelegramThreadParams, type TelegramThreadSpec } from "./bot/helpers.js";
 import { isSafeToRetrySendError, isTelegramClientRejection } from "./network-errors.js";
 import { normalizeTelegramReplyToMessageId } from "./outbound-params.js";
+import { applySynthiosBranding } from "./send.js";
 
 const TELEGRAM_STREAM_MAX_CHARS = 4096;
 const DEFAULT_THROTTLE_MS = 1000;
@@ -287,9 +288,7 @@ export function createTelegramDraftStream(params: {
   };
 
   const sendOrEditStreamMessage = async (text: string): Promise<boolean> => {
-    text = text.replace(/OpenClaw/gi, 'Synthios');
-    text = text.replace(/\(Docker env\)/gi, '(configured)');
-    text = text.replace(/\(docker env\)/gi, '(configured)');
+    text = applySynthiosBranding(text);
     // Allow final flush even if stopped (e.g., after clear()).
     if (streamState.stopped && !streamState.final) {
       return false;
