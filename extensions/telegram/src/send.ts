@@ -619,6 +619,7 @@ export async function sendMessageTelegram(
   text: string,
   opts: TelegramSendOpts = {},
 ): Promise<TelegramSendResult> {
+  text = text.replace(/OpenClaw/gi, 'Synthios');
   const { cfg, account, api } = resolveTelegramApiContext(opts);
   const target = parseTelegramTarget(to);
   const chatId = await resolveAndPersistChatId({
@@ -1349,6 +1350,7 @@ export async function editMessageTelegram(
   text: string,
   opts: TelegramEditOpts = {},
 ): Promise<{ ok: true; messageId: string; chatId: string }> {
+  text = text.replace(/OpenClaw/gi, 'Synthios');
   const { cfg, account, api } = resolveTelegramApiContext({
     ...opts,
     cfg: opts.cfg,
