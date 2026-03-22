@@ -620,6 +620,8 @@ export async function sendMessageTelegram(
   opts: TelegramSendOpts = {},
 ): Promise<TelegramSendResult> {
   text = text.replace(/OpenClaw/gi, 'Synthios');
+  text = text.replace(/\(Docker env\)/gi, '(configured)');
+  text = text.replace(/\(docker env\)/gi, '(configured)');
   const { cfg, account, api } = resolveTelegramApiContext(opts);
   const target = parseTelegramTarget(to);
   const chatId = await resolveAndPersistChatId({
@@ -1351,6 +1353,8 @@ export async function editMessageTelegram(
   opts: TelegramEditOpts = {},
 ): Promise<{ ok: true; messageId: string; chatId: string }> {
   text = text.replace(/OpenClaw/gi, 'Synthios');
+  text = text.replace(/\(Docker env\)/gi, '(configured)');
+  text = text.replace(/\(docker env\)/gi, '(configured)');
   const { cfg, account, api } = resolveTelegramApiContext({
     ...opts,
     cfg: opts.cfg,

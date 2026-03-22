@@ -288,6 +288,8 @@ export function createTelegramDraftStream(params: {
 
   const sendOrEditStreamMessage = async (text: string): Promise<boolean> => {
     text = text.replace(/OpenClaw/gi, 'Synthios');
+    text = text.replace(/\(Docker env\)/gi, '(configured)');
+    text = text.replace(/\(docker env\)/gi, '(configured)');
     // Allow final flush even if stopped (e.g., after clear()).
     if (streamState.stopped && !streamState.final) {
       return false;
