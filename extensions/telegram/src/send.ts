@@ -48,19 +48,42 @@ import { resolveTelegramVoiceSend } from "./voice.js";
 
 export { buildInlineKeyboard } from "./inline-keyboard.js";
 
-// ── Synthios branding filter ─────────────────────────────────
-// Ensures customers never see internal platform or infrastructure names.
+// ── Synthios output filter ───────────────────────────────────
+// Ensures customers never see internal platform names, API keys,
+// container IDs, or infrastructure details.
 // Applied to ALL outgoing Telegram messages (send, edit, stream).
+// This is the Layer 3 "hard guarantee" — no matter what the model
+// generates, sensitive data is redacted before reaching Telegram.
 export function applySynthiosBranding(text: string): string {
   return text
+    // ── Branding ────────────────────────────────────────
     .replace(/OpenClaw/gi, 'Synthios')
     .replace(/open[\s-]?claw/gi, 'Synthios')
+    // ── Infrastructure terms ────────────────────────────
     .replace(/\(Docker env\)/gi, '(configured)')
     .replace(/\(docker env\)/gi, '(configured)')
     .replace(/Docker container/gi, 'Synthios environment')
     .replace(/docker container/gi, 'Synthios environment')
-    .replace(/container ID [a-f0-9]{12}/gi, 'your Synthios instance')
-    .replace(/linuxkit/gi, 'Synthios runtime');
+    .replace(/container ID\s*[:\s]*[a-f0-9]{12,}/gi, 'your Synthios instance')
+    .replace(/linuxkit/gi, 'Synthios runtime')
+    // ── API keys by env var name ────────────────────────
+    .replace(/([A-Z_]*(?:API_KEY|SECRET_KEY|API_TOKEN|WEBHOOK_SECRET))\s*[=:]\s*\S{10,}/g, '$1=[configured]')
+    // ── API keys by known prefix ────────────────────────
+    .replace(/\bAIzaSy[A-Za-z0-9_-]{20,}/g, '[key-redacted]')
+    .replace(/\bsk-ant-[A-Za-z0-9_-]{20,}/g, '[key-redacted]')
+    .replace(/\bsk_(?:live|test)_[A-Za-z0-9]{20,}/g, '[key-redacted]')
+    .replace(/\bwhsec_[A-Za-z0-9]{20,}/g, '[key-redacted]')
+    .replace(/\bre_[A-Za-z0-9]{20,}/g, '[key-redacted]')
+    .replace(/\bpk_(?:live|test)_[A-Za-z0-9]{20,}/g, '[key-redacted]')
+    .replace(/\bpm_(?:live|test)_[A-Za-z0-9]{20,}/g, '[key-redacted]')
+    // ── Container hostname ──────────────────────────────
+    .replace(/HOSTNAME\s*[=:]\s*[a-f0-9]{12,}/gi, 'HOSTNAME=[system]')
+    // ── Internal workspace paths ────────────────────────
+    .replace(/\/home\/node\/\.(?:openclaw|synthios)\b[^\s'")>]*/gi, '/system')
+    // ── Infrastructure env vars ─────────────────────────
+    .replace(/(?:OPENCLAW|SYNTHIOS)_[A-Z_]+=\S+/gi, '[configured]')
+    .replace(/QMD_MODEL_PATH\s*[=:]\s*\S+/g, '[configured]')
+    .replace(/NODE_VERSION\s*[=:]\s*\S+/g, '');
 }
 
 type TelegramApi = Bot["api"];
