@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { buildAnthropicCliBackend } from "./cli-backend.js";
 import {
   CLAUDE_CLI_CLEAR_ENV,
-  CLAUDE_CLI_HOST_MANAGED_ENV,
   normalizeClaudeBackendConfig,
   normalizeClaudePermissionArgs,
   normalizeClaudeSettingSourcesArgs,
@@ -108,6 +107,21 @@ describe("normalizeClaudeBackendConfig", () => {
       "--permission-mode",
       "bypassPermissions",
     ]);
+    expect(normalized.output).toBe("jsonl");
+    expect(normalized.liveSession).toBe("claude-stdio");
+    expect(normalized.input).toBe("stdin");
+  });
+
+  it("does not infer live stdio when explicit transport overrides are incompatible", () => {
+    const normalized = normalizeClaudeBackendConfig({
+      command: "claude",
+      output: "json",
+      input: "arg",
+    });
+
+    expect(normalized.output).toBe("json");
+    expect(normalized.liveSession).toBeUndefined();
+    expect(normalized.input).toBe("arg");
   });
 
   it("is wired through the anthropic cli backend normalize hook", () => {
@@ -130,18 +144,25 @@ describe("normalizeClaudeBackendConfig", () => {
     expect(normalized?.resumeArgs).toContain("bypassPermissions");
     expect(normalized?.resumeArgs).toContain("--setting-sources");
     expect(normalized?.resumeArgs).toContain("user");
+    expect(normalized?.liveSession).toBe("claude-stdio");
   });
 
-  it("marks claude cli as host-managed, restricts setting sources, and clears inherited env overrides", () => {
+  it("leaves claude cli subscription-managed, restricts setting sources, and clears inherited env overrides", () => {
     const backend = buildAnthropicCliBackend();
 
-    expect(backend.config.env).toEqual(CLAUDE_CLI_HOST_MANAGED_ENV);
+    expect(backend.config.env).toBeUndefined();
+    expect(backend.config.liveSession).toBe("claude-stdio");
+    expect(backend.config.output).toBe("jsonl");
+    expect(backend.config.input).toBe("stdin");
     expect(backend.config.args).toContain("--setting-sources");
     expect(backend.config.args).toContain("user");
     expect(backend.config.resumeArgs).toContain("--setting-sources");
     expect(backend.config.resumeArgs).toContain("user");
     expect(backend.config.clearEnv).toEqual([...CLAUDE_CLI_CLEAR_ENV]);
+    expect(backend.config.clearEnv).toContain("ANTHROPIC_API_TOKEN");
     expect(backend.config.clearEnv).toContain("ANTHROPIC_BASE_URL");
+    expect(backend.config.clearEnv).toContain("ANTHROPIC_CUSTOM_HEADERS");
+    expect(backend.config.clearEnv).toContain("ANTHROPIC_OAUTH_TOKEN");
     expect(backend.config.clearEnv).toContain("CLAUDE_CONFIG_DIR");
     expect(backend.config.clearEnv).toContain("CLAUDE_CODE_USE_BEDROCK");
     expect(backend.config.clearEnv).toContain("CLAUDE_CODE_OAUTH_TOKEN");

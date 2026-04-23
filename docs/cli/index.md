@@ -47,7 +47,7 @@ This page describes the current CLI behavior. If commands change, update this do
 - [`tui`](/cli/tui)
 - [`browser`](/cli/browser)
 - [`cron`](/cli/cron)
-- [`tasks`](/cli/index#tasks)
+- [`tasks`](/cli/tasks)
 - [`flows`](/cli/flows)
 - [`dns`](/cli/dns)
 - [`docs`](/cli/docs)
@@ -431,7 +431,7 @@ Notes:
 
 ## Plugins
 
-Manage extensions and their config:
+Manage plugins and their config:
 
 - `openclaw plugins list` — discover plugins (use `--json` for machine output).
 - `openclaw plugins inspect <id>` — show details for a plugin (`info` is an alias).
@@ -473,6 +473,7 @@ Chat messages support `/...` commands (text and native). See [/tools/slash-comma
 Highlights:
 
 - `/status` for quick diagnostics.
+- `/trace` for session-scoped plugin trace/debug lines.
 - `/config` for persisted config changes.
 - `/debug` for runtime-only config overrides (memory, not disk; requires `commands.debug: true`).
 
@@ -852,7 +853,7 @@ Subcommands:
 Notes:
 
 - `devices list` and `devices approve` can fall back to local pairing files on local loopback when direct pairing scope is unavailable.
-- `devices approve` auto-selects the newest pending request when no `requestId` is passed or `--latest` is set.
+- `devices approve` requires an explicit request ID before minting tokens; omitting `requestId` or passing `--latest` only previews the newest pending request.
 - Stored-token reconnects reuse the token's cached approved scopes; explicit
   `devices rotate --scope ...` updates that stored scope set for future
   cached-token reconnects.
@@ -993,7 +994,7 @@ Options:
 - `-t, --to <dest>` (for session key and optional delivery)
 - `--session-id <id>`
 - `--agent <id>` (agent id; overrides routing bindings)
-- `--thinking <off|minimal|low|medium|high|xhigh>` (provider support varies; not model-gated at CLI level)
+- `--thinking <level>` (validated against the selected model's provider profile)
 - `--verbose <on|off>`
 - `--channel <channel>` (delivery channel; omit to use the main session channel)
 - `--reply-to <target>` (delivery target override, separate from session routing)
@@ -1527,9 +1528,12 @@ Options:
 
 - `--all`
 - `--local`
-- `--provider <name>`
+- `--provider <id>`
 - `--json`
 - `--plain`
+
+`--all` includes bundled provider-owned static catalog rows before auth is
+configured. Rows remain unavailable until matching provider credentials exist.
 
 ### `models status`
 
