@@ -1,7 +1,7 @@
 import type { Bot } from "grammy";
 import {
-  clearFinalizableDraftMessage,
   createFinalizableDraftStreamControlsForState,
+  takeMessageIdAfterStop,
 } from "openclaw/plugin-sdk/channel-lifecycle";
 import { formatErrorMessage } from "openclaw/plugin-sdk/error-runtime";
 import { buildTelegramThreadParams, type TelegramThreadSpec } from "./bot/helpers.js";
@@ -95,6 +95,7 @@ export type TelegramDraftStream = {
   update: (text: string) => void;
   flush: () => Promise<void>;
   messageId: () => number | undefined;
+  visibleSinceMs?: () => number | undefined;
   previewMode?: () => "message" | "draft";
   previewRevision?: () => number;
   lastDeliveredText?: () => string;
@@ -119,6 +120,7 @@ type SupersededTelegramPreview = {
   messageId: number;
   textSnapshot: string;
   parseMode?: "HTML";
+  visibleSinceMs?: number;
 };
 
 export function createTelegramDraftStream(params: {
@@ -175,6 +177,7 @@ export function createTelegramDraftStream(params: {
   const streamState = { stopped: false, final: false };
   let messageSendAttempted = false;
   let streamMessageId: number | undefined;
+  let streamVisibleSinceMs: number | undefined;
   let streamDraftId = usesDraftTransport ? allocateTelegramDraftId() : undefined;
   let previewTransport: "message" | "draft" = usesDraftTransport ? "draft" : "message";
   let lastSentText = "";
@@ -227,6 +230,7 @@ export function createTelegramDraftStream(params: {
     sendGeneration,
   }: PreviewSendParams): Promise<boolean> => {
     if (typeof streamMessageId === "number") {
+      streamVisibleSinceMs ??= Date.now();
       if (renderedParseMode) {
         await params.api.editMessageText(chatId, streamMessageId, renderedText, {
           parse_mode: renderedParseMode,
@@ -258,15 +262,18 @@ export function createTelegramDraftStream(params: {
       return false;
     }
     const normalizedMessageId = Math.trunc(sentMessageId);
+    const visibleSinceMs = Date.now();
     if (sendGeneration !== generation) {
       params.onSupersededPreview?.({
         messageId: normalizedMessageId,
         textSnapshot: renderedText,
         parseMode: renderedParseMode,
+        visibleSinceMs,
       });
       return true;
     }
     streamMessageId = normalizedMessageId;
+    streamVisibleSinceMs = visibleSinceMs;
     return true;
   };
   const sendDraftTransportPreview = async ({
@@ -375,23 +382,32 @@ export function createTelegramDraftStream(params: {
   });
 
   const clear = async () => {
-    await clearFinalizableDraftMessage({
+    const messageId = await takeMessageIdAfterStop({
       stopForClear,
       readMessageId: () => streamMessageId,
       clearMessageId: () => {
         streamMessageId = undefined;
       },
-      isValidMessageId: (value): value is number =>
-        typeof value === "number" && Number.isFinite(value),
-      deleteMessage: async (messageId) => {
-        await params.api.deleteMessage(chatId, messageId);
-      },
-      onDeleteSuccess: (messageId) => {
-        params.log?.(`telegram stream preview deleted (chat=${chatId}, message=${messageId})`);
-      },
-      warn: params.warn,
-      warnPrefix: "telegram stream preview cleanup failed",
     });
+    if (typeof messageId === "number" && Number.isFinite(messageId)) {
+      try {
+        await params.api.deleteMessage(chatId, messageId);
+        params.log?.(`telegram stream preview deleted (chat=${chatId}, message=${messageId})`);
+      } catch (err) {
+        params.warn?.(`telegram stream preview cleanup failed: ${formatErrorMessage(err)}`);
+      }
+      return;
+    }
+    if (previewTransport !== "draft" || resolvedDraftApi == null || streamDraftId == null) {
+      return;
+    }
+    const clearDraftId = streamDraftId;
+    streamDraftId = undefined;
+    try {
+      await resolvedDraftApi(chatId, clearDraftId, "", threadParams);
+    } catch (err) {
+      params.warn?.(`telegram stream preview cleanup failed: ${formatErrorMessage(err)}`);
+    }
   };
 
   const discard = async () => {
@@ -399,10 +415,12 @@ export function createTelegramDraftStream(params: {
   };
 
   const forceNewMessage = () => {
+    streamState.stopped = false;
     streamState.final = false;
     generation += 1;
     messageSendAttempted = false;
     streamMessageId = undefined;
+    streamVisibleSinceMs = undefined;
     if (previewTransport === "draft") {
       streamDraftId = allocateTelegramDraftId();
     }
@@ -432,6 +450,7 @@ export function createTelegramDraftStream(params: {
       const sentId = sent?.message_id;
       if (typeof sentId === "number" && Number.isFinite(sentId)) {
         streamMessageId = Math.trunc(sentId);
+        streamVisibleSinceMs = Date.now();
         if (resolvedDraftApi != null && streamDraftId != null) {
           const clearDraftId = streamDraftId;
           const clearThreadParams =
@@ -456,6 +475,7 @@ export function createTelegramDraftStream(params: {
     update,
     flush: loop.flush,
     messageId: () => streamMessageId,
+    visibleSinceMs: () => streamVisibleSinceMs,
     previewMode: () => previewTransport,
     previewRevision: () => previewRevision,
     lastDeliveredText: () => lastDeliveredText,
