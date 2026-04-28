@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   }),
   loadProviderCatalogModelsForList: vi.fn().mockResolvedValue([
     {
-      id: "gpt-5.4",
-      name: "gpt-5.4",
+      id: "gpt-5.5",
+      name: "gpt-5.5",
       provider: "codex",
       api: "openai-codex-responses",
       baseUrl: "https://chatgpt.com/backend-api",
@@ -23,9 +23,15 @@ vi.mock("../../agents/model-suppression.js", () => ({
   shouldSuppressBuiltInModel: mocks.shouldSuppressBuiltInModel,
 }));
 
-vi.mock("./list.runtime.js", () => ({
+vi.mock("./list.provider-catalog.js", () => ({
   loadProviderCatalogModelsForList: mocks.loadProviderCatalogModelsForList,
+}));
+
+vi.mock("../../agents/auth-profiles/profile-list.js", () => ({
   listProfilesForProvider: mocks.listProfilesForProvider,
+}));
+
+vi.mock("../../agents/model-auth.js", () => ({
   resolveAwsSdkEnvVarName: vi.fn().mockReturnValue(undefined),
   resolveEnvApiKey: vi.fn().mockReturnValue(null),
   hasUsableCustomProviderApiKey: vi.fn().mockReturnValue(false),
@@ -57,7 +63,7 @@ describe("appendProviderCatalogRows", () => {
       seenKeys: new Set(),
       context: {
         cfg: {
-          agents: { defaults: { model: { primary: "codex/gpt-5.4" } } },
+          agents: { defaults: { model: { primary: "codex/gpt-5.5" } } },
           models: { providers: {} },
         },
         agentDir: "/tmp/openclaw-agent",
@@ -72,7 +78,7 @@ describe("appendProviderCatalogRows", () => {
     expect(mocks.shouldSuppressBuiltInModel).not.toHaveBeenCalled();
     expect(rows).toMatchObject([
       {
-        key: "codex/gpt-5.4",
+        key: "codex/gpt-5.5",
         available: true,
         missing: false,
       },

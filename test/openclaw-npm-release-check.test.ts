@@ -8,6 +8,7 @@ import {
   collectControlUiPackErrors,
   collectForbiddenPackedContentErrors,
   collectForbiddenPackedPathErrors,
+  collectInventoryPackMismatchErrors,
   collectPackedTestCargoErrors,
   collectReleasePackageMetadataErrors,
   collectReleaseTagErrors,
@@ -313,6 +314,30 @@ describe("collectControlUiPackErrors", () => {
 });
 
 describe("collectForbiddenPackedPathErrors", () => {
+  it("rejects dist inventories that reference entries missing from npm pack", () => {
+    const rootDir = mkdtempSync(join(tmpdir(), "openclaw-pack-inventory-"));
+
+    try {
+      mkdirSync(join(rootDir, "dist"), { recursive: true });
+      writeFileSync(
+        join(rootDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH),
+        JSON.stringify(["dist/current.js", "dist/extensions/qa-channel/runtime-api.js"]),
+        "utf8",
+      );
+
+      expect(
+        collectInventoryPackMismatchErrors(
+          [PACKAGE_DIST_INVENTORY_RELATIVE_PATH, "dist/current.js"],
+          rootDir,
+        ),
+      ).toEqual([
+        "inventory references missing npm pack entry dist/extensions/qa-channel/runtime-api.js",
+      ]);
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects generated docs artifacts in npm pack output", () => {
     expect(
       collectForbiddenPackedPathErrors([
@@ -519,13 +544,11 @@ describe("collectReleasePackageMetadataErrors", () => {
         license: "MIT",
         repository: { url: "git+https://github.com/openclaw/openclaw.git" },
         bin: { openclaw: "openclaw.mjs" },
-        peerDependencies: { "node-llama-cpp": "3.18.1" },
-        peerDependenciesMeta: { "node-llama-cpp": { optional: true } },
       }),
     ).toEqual([]);
   });
 
-  it("requires node-llama-cpp to stay an optional peer", () => {
+  it("rejects node-llama-cpp as a peer dependency", () => {
     expect(
       collectReleasePackageMetadataErrors({
         name: "openclaw",
@@ -534,7 +557,39 @@ describe("collectReleasePackageMetadataErrors", () => {
         repository: { url: "git+https://github.com/openclaw/openclaw.git" },
         bin: { openclaw: "openclaw.mjs" },
         peerDependencies: { "node-llama-cpp": "3.18.1" },
+        peerDependenciesMeta: { "node-llama-cpp": { optional: true } },
       }),
-    ).toContain('package.json peerDependenciesMeta["node-llama-cpp"].optional must be true.');
+    ).toEqual([
+      'package.json peerDependencies["node-llama-cpp"] must be omitted; keep it optional.',
+      'package.json peerDependenciesMeta["node-llama-cpp"] must be omitted; keep it optional.',
+    ]);
+  });
+
+  it("rejects node-llama-cpp as a direct runtime dependency", () => {
+    expect(
+      collectReleasePackageMetadataErrors({
+        name: "openclaw",
+        description: "Multi-channel AI gateway with extensible messaging integrations",
+        license: "MIT",
+        repository: { url: "git+https://github.com/openclaw/openclaw.git" },
+        bin: { openclaw: "openclaw.mjs" },
+        dependencies: { "node-llama-cpp": "3.18.1" },
+      }),
+    ).toContain('package.json dependencies["node-llama-cpp"] must be omitted; keep it optional.');
+  });
+
+  it("rejects node-llama-cpp as an optional dependency", () => {
+    expect(
+      collectReleasePackageMetadataErrors({
+        name: "openclaw",
+        description: "Multi-channel AI gateway with extensible messaging integrations",
+        license: "MIT",
+        repository: { url: "git+https://github.com/openclaw/openclaw.git" },
+        bin: { openclaw: "openclaw.mjs" },
+        optionalDependencies: { "node-llama-cpp": "3.18.1" },
+      }),
+    ).toContain(
+      'package.json optionalDependencies["node-llama-cpp"] must be omitted; keep it operator-installed.',
+    );
   });
 });
