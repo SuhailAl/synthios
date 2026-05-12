@@ -15,7 +15,7 @@ import {
 } from "../canvas-host/a2ui.js";
 import type { CanvasHostHandler } from "../canvas-host/server.js";
 import { resolveBundledChannelGatewayAuthBypassPaths } from "../channels/plugins/gateway-auth-bypass.js";
-import { getRuntimeConfig } from "../config/config.js";
+import { getRuntimeConfig } from "../config/io.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   createDiagnosticTraceContext,
@@ -212,6 +212,10 @@ function isOpenResponsesPath(pathname: string): boolean {
 
 function isToolsInvokePath(pathname: string): boolean {
   return pathname === "/tools/invoke";
+}
+
+function isManagedOutgoingImagePath(pathname: string): boolean {
+  return pathname.startsWith("/api/chat/media/outgoing/");
 }
 
 function isSessionKillPath(pathname: string): boolean {
@@ -724,20 +728,22 @@ export function createGatewayHttpServer(opts: {
         }),
       );
 
-      requestStages.push({
-        name: "chat-managed-image-media",
-        run: async () =>
-          (await getManagedImageAttachmentsModule()).handleManagedOutgoingImageHttpRequest(
-            req,
-            res,
-            {
-              auth: resolvedAuth,
-              trustedProxies,
-              allowRealIpFallback,
-              rateLimiter,
-            },
-          ),
-      });
+      if (isManagedOutgoingImagePath(scopedRequestPath)) {
+        requestStages.push({
+          name: "chat-managed-image-media",
+          run: async () =>
+            (await getManagedImageAttachmentsModule()).handleManagedOutgoingImageHttpRequest(
+              req,
+              res,
+              {
+                auth: resolvedAuth,
+                trustedProxies,
+                allowRealIpFallback,
+                rateLimiter,
+              },
+            ),
+        });
+      }
 
       if (controlUiEnabled) {
         requestStages.push({
